@@ -2,49 +2,60 @@
 <html lang="nb">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>Breakout – Tippekupong for Bjørnar</title>
 <style>
   :root{
-    --bg:#0d1117; --panel:#161b22; --ink:#e6edf3; --muted:#9fb1d1;
-    --line:#30363d; --pepsi:#1e2a78; --cola:#b30000;
+    --bg:#0d1117; --panel:#161b22; --ink:#e6edf3; --muted:#9fb1d1; --line:#30363d;
+    --pepsi:#1e2a78; --cola:#b30000; --accent:#2ea043;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,Segoe UI,Roboto,Arial}
-  body{overflow:hidden}
-  header{height:54px;display:flex;align-items:center;gap:10px;justify-content:center;
-         background:var(--panel);border-bottom:1px solid var(--line);padding:6px 10px}
+  body{overflow:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  /* Toppfelt: mer luft og bedre plassering */
+  header{
+    display:flex; align-items:center; justify-content:center; gap:16px;
+    background:var(--panel); border-bottom:1px solid var(--line);
+    padding:10px 12px; min-height:56px;
+  }
   h1{margin:0;font-size:16px}
-  .hud{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .hud{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .stat{background:#10151d;border:1px solid var(--line);padding:6px 10px;border-radius:10px;min-width:96px;text-align:center}
   .stat b{font-size:18px}
-  .btns{display:flex;gap:6px;flex-wrap:wrap}
-  button{cursor:pointer;border:1px solid var(--line);background:#0f1622;color:var(--ink);padding:8px 10px;border-radius:10px;font-weight:600}
+
+  #stage{height:calc(100vh - (env(safe-area-inset-top) + env(safe-area-inset-bottom)) - 56px);
+         display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:10px;
+         padding:8px 12px;}
+  #canvasWrap{position:relative; transform-origin:top center;}
+  canvas{display:block; background:linear-gradient(180deg,#0b1220,#0a0f18); border-radius:12px; border:1px solid #112}
+
+  /* Verktøylinje under spillet (desktop/tablet) */
+  .toolbar{
+    display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;
+    background:#10151d; border:1px solid var(--line); border-radius:12px; padding:8px 10px; width:min(960px,100%);
+    box-shadow:0 6px 24px rgba(0,0,0,0.25);
+  }
+  .toolbar .group{display:flex; gap:8px; flex-wrap:wrap}
+  button{
+    cursor:pointer; border:1px solid var(--line); background:#0f1622; color:var(--ink);
+    padding:9px 12px; border-radius:12px; font-weight:700; min-width:110px
+  }
   button:hover{border-color:#445}
-  #stage{height:calc(100vh - 54px);display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
-  #canvasWrap{position:relative;transform-origin:top center;}
-  canvas{display:block;background:linear-gradient(180deg,#0b1220,#0a0f18);border-radius:12px;border:1px solid #112}
-  .msg{height:28px;display:flex;align-items:center;justify-content:center;margin-top:4px;font-weight:700}
-  .msg .soda{padding:2px 8px;border-radius:999px;margin:0 4px;color:#fff}
-  .soda.pepsi{background:var(--pepsi)}
-  .soda.cola{background:var(--cola)}
-  .touch{display:none;gap:8px;justify-content:center;margin-top:6px}
-  .touch button{width:120px}
-  @media (pointer:coarse){ .touch{display:flex} }
+  .primary{background:#13253a}
+  .accent{background:#0f2116; border-color:#1d3b1d}
+
+  .msg{height:28px; display:flex; align-items:center; justify-content:center; font-weight:700}
+  .msg .soda{padding:2px 8px; border-radius:999px; margin:0 4px; color:#fff}
+  .soda.pepsi{background:var(--pepsi)} .soda.cola{background:var(--cola)}
 
   /* Skilt (pop-up) */
   .sign{
     position:absolute; left:50%; top:46%;
     transform:translate(-50%,-50%) scale(0.9);
     background:rgba(16,21,29,0.95);
-    border:2px solid var(--line);
-    border-radius:14px;
-    padding:10px 16px;
-    font-weight:800; letter-spacing:0.2px;
-    text-align:center; white-space:nowrap;
-    box-shadow:0 8px 30px rgba(0,0,0,0.5);
-    animation:pop 900ms ease forwards;
-    pointer-events:none;
+    border:2px solid var(--line); border-radius:14px;
+    padding:10px 16px; font-weight:800; letter-spacing:0.2px; text-align:center; white-space:nowrap;
+    box-shadow:0 8px 30px rgba(0,0,0,0.5); animation:pop 900ms ease forwards; pointer-events:none;
   }
   .sign small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
   @keyframes pop{
@@ -52,6 +63,26 @@
     15%{opacity:1; transform:translate(-50%,-50%) scale(1.0)}
     70%{opacity:1}
     100%{opacity:0; transform:translate(-50%,-58%) scale(0.96)}
+  }
+
+  /* Mobil-dock: fast nederst, store knapper */
+  .dock{
+    position:fixed; left:0; right:0; bottom:0;
+    background:rgba(16,21,29,0.96); border-top:1px solid var(--line);
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    display:none; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;
+    box-shadow:0 -12px 28px rgba(0,0,0,0.35);
+  }
+  .dock button{min-width:42%; padding:12px 14px; font-size:16px}
+  .dock .row{display:flex; gap:10px; width:100%; justify-content:space-between}
+  .dock .row.full{justify-content:center}
+  .dock .wide{flex:1}
+  .dock .move{min-width:48%}
+
+  /* Synlig på små skjermer */
+  @media (max-width: 900px){
+    .toolbar{display:none}
+    .dock{display:flex}
   }
 </style>
 </head>
@@ -63,12 +94,6 @@
     <div class="stat">Level<br><b id="level">1</b></div>
     <div class="stat">Liv<br><b id="lives">3</b></div>
   </div>
-  <div class="btns">
-    <button id="btnStart">Start</button>
-    <button id="btnPause">Pause</button>
-    <button id="btnSound">Lyd: Av</button>
-    <button id="btnSpeak">Tale: På</button>
-  </div>
 </header>
 
 <div id="stage" aria-live="polite">
@@ -76,30 +101,59 @@
     <canvas id="game" width="800" height="520" aria-label="Breakout-brett"></canvas>
     <canvas id="ribbon" width="800" height="16" style="position:absolute;left:0;top:0;pointer-events:none"></canvas>
   </div>
-  <div class="touch">
-    <button id="leftBtn">◀ Venstre</button>
-    <button id="rightBtn">Høyre ▶</button>
+
+  <!-- Verktøylinje under spillet (skjules på mobil til fordel for dock) -->
+  <div class="toolbar" role="toolbar" aria-label="Spillkontroller">
+    <div class="group">
+      <button id="btnStart" class="primary">Start / Restart</button>
+      <button id="btnPause">Pause</button>
+    </div>
+    <div class="group">
+      <button id="btnSound">Lyd: Av</button>
+      <button id="btnSpeak" class="accent">Tale: På</button>
+    </div>
+    <div class="group">
+      <button id="btnLeft">◀ Venstre</button>
+      <button id="btnRight">Høyre ▶</button>
+    </div>
   </div>
+
   <div id="feedback" class="msg"></div>
+</div>
+
+<!-- Mobil-dock (fast nederst) -->
+<div class="dock" role="toolbar" aria-label="Spillkontroller (mobil)">
+  <div class="row">
+    <button id="mStart" class="primary wide">Start</button>
+    <button id="mPause" class="wide">Pause</button>
+  </div>
+  <div class="row">
+    <button id="mLeft" class="move">◀ Venstre</button>
+    <button id="mRight" class="move">Høyre ▶</button>
+  </div>
+  <div class="row full">
+    <button id="mSound">Lyd: Av</button>
+    <button id="mSpeak" class="accent">Tale: På</button>
+  </div>
 </div>
 
 <script>
 (()=>{
-  // ---- Spillnavn som skal sies ved treff ----
+  // ---- Spillnavn som sies ved treff ----
   const SPILL = ["Lotto","Vikinglotto","Nabolaget","Eurojackpot","Extra","Joker","Keno"];
 
-  // Oppmuntringer – kun mestring, alltid med "Bjørnar", aldri sammen med spillnavn
+  // Oppmuntringer – kun mestring, alltid med "Bjørnar"
   const PRAISE = [
     "Bra jobba, Bjørnar!",
     "Nydelig kontroll, Bjørnar!",
     "Perfekt timing, Bjørnar!",
     "Sterkt spilt, Bjørnar!",
-    "Fytti, dette sitter, Bjørnar!",
     "Is i magen, Bjørnar!",
     "Du eier brettet, Bjørnar!",
     "Herlig flyt, Bjørnar!",
     "Knallbra fokus, Bjørnar!",
-    "Kongejobb, Bjørnar!"
+    "Kongejobb, Bjørnar!",
+    "Dette sitter, Bjørnar!"
   ];
   let praiseBag = shuffle([...PRAISE]);
   const nextPraise = () => (praiseBag.length? praiseBag: (praiseBag = shuffle([...PRAISE]))).pop();
@@ -116,12 +170,21 @@
   const livesEl = document.getElementById('lives');
   const feedback = document.getElementById('feedback');
 
+  // Desktop-knapper
   const btnStart = document.getElementById('btnStart');
   const btnPause = document.getElementById('btnPause');
   const btnSound = document.getElementById('btnSound');
   const btnSpeak = document.getElementById('btnSpeak');
-  const leftBtn = document.getElementById('leftBtn');
-  const rightBtn = document.getElementById('rightBtn');
+  const btnLeft = document.getElementById('btnLeft');
+  const btnRight = document.getElementById('btnRight');
+
+  // Mobil-dock-knapper
+  const mStart = document.getElementById('mStart');
+  const mPause = document.getElementById('mPause');
+  const mSound = document.getElementById('mSound');
+  const mSpeak = document.getElementById('mSpeak');
+  const mLeft = document.getElementById('mLeft');
+  const mRight = document.getElementById('mRight');
 
   const BASE_W = 800, BASE_H = 520;
 
@@ -159,7 +222,7 @@
 
   let rows=5, cols=10, gap=6, brickH=22, bricks=[], colors=["#58a6ff","#39d353","#ff7b72","#d2a8ff","#f2cc60","#8b949e","#7ee787"];
 
-  // Periodisk personlig oppmuntring (kun mestring, ikke spillnavn)
+  // Periodisk personlig oppmuntring
   let lastCheer = 0;
   const CHEER_INTERVAL = 5500; // min hvert 5.5 s
 
@@ -263,10 +326,8 @@
       if(!b.alive) continue;
       if(ball.x > b.x && ball.x < b.x + b.w && ball.y > b.y && ball.y < b.y + b.h){
         b.alive = false;
-        score += 10;
-        scoreEl.textContent = score;
-        ball.dy *= -1;
-        tone(900,0.06);
+        score += 10; scoreEl.textContent = score;
+        ball.dy *= -1; tone(900,0.06);
 
         // Si kun spillnavnet ved treff
         say(b.label);
@@ -284,14 +345,14 @@
     if(ball.y - ball.r > BASE_H){
       lives--; livesEl.textContent = lives; tone(200,0.2);
       if(lives<=0){
-        const l = "Ny runde, Bjørnar – dette tar du!";
         feedback.innerHTML = spice("Game over – prøv igjen!");
-        say(l); showSign("Game over", "Trykk Start for ny runde");
+        say("Ny runde, Bjørnar – dette tar du!");
+        showSign("Game over","Trykk Start for ny runde");
         running=false;
       } else {
         feedback.textContent = "Ny ball!";
-        const l = "På’n igjen, Bjørnar!";
-        say(l); showSign(l);
+        say("På’n igjen, Bjørnar!");
+        showSign("Ny ball!");
         resetBall();
       }
     }
@@ -302,8 +363,8 @@
       rows = Math.min(8, rows+1);
       ball.speedMul += 0.05;
       feedback.textContent = `Level ${level}!`;
-      const l = `Level ${level} – sterkt, Bjørnar!`;
-      say(l); showSign(`Level ${level}`, "Gå for gull!");
+      say(`Level ${level}`);
+      showSign(`Level ${level}`, "Gå for gull!");
       buildBricks(); resetBall();
     }
   }
@@ -313,7 +374,7 @@
     requestAnimationFrame(loop);
   }
 
-  // ---- Input ----
+  // ---- Tast & piltaster ----
   document.addEventListener('keydown', e=>{
     if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A'){ paddle.dx = -paddle.speed; e.preventDefault(); }
     if(e.key==='ArrowRight'|| e.key==='d' || e.key==='D'){ paddle.dx =  paddle.speed; e.preventDefault(); }
@@ -322,32 +383,70 @@
   document.addEventListener('keyup', e=>{
     if(['ArrowLeft','a','A','ArrowRight','d','D'].includes(e.key)){ paddle.dx = 0; }
   });
-  // Touch
-  const touchable = matchMedia('(pointer:coarse)').matches;
-  if(touchable){
-    leftBtn.addEventListener('touchstart', e=>{ paddle.dx=-paddle.speed; e.preventDefault(); });
-    rightBtn.addEventListener('touchstart', e=>{ paddle.dx= paddle.speed; e.preventDefault(); });
-    const stopTouch=()=>{ paddle.dx=0; };
-    leftBtn.addEventListener('touchend', stopTouch); rightBtn.addEventListener('touchend', stopTouch);
-  }
 
-  // ---- Knappelogikk ----
-  btnStart.onclick = ()=>{
+  // ---- Pek/drag-styring direkte på canvas (mobilvennlig) ----
+  let dragging = false;
+  function setFromEvt(evt){
+    const rect = cvs.getBoundingClientRect();
+    const x = (evt.touches? evt.touches[0].clientX : evt.clientX) - rect.left;
+    // beregn i canvas-koordinater: ta hensyn til scale
+    const scale = rect.width / BASE_W;
+    const cx = x / scale;
+    paddle.x = Math.max(0, Math.min(BASE_W - paddle.w, cx - paddle.w/2));
+  }
+  cvs.addEventListener('pointerdown', e=>{ dragging=true; setFromEvt(e); });
+  cvs.addEventListener('pointermove', e=>{ if(dragging) setFromEvt(e); });
+  window.addEventListener('pointerup', ()=> dragging=false);
+  cvs.addEventListener('touchstart', e=>{ setFromEvt(e); }, {passive:false});
+  cvs.addEventListener('touchmove', e=>{ setFromEvt(e); }, {passive:false});
+  cvs.addEventListener('touchend', ()=>{} );
+
+  // ---- Desktop-knapper ----
+  btnStart.onclick = ()=> startGame();
+  btnPause.onclick = ()=> togglePause();
+  btnSound.onclick = ()=> toggleSound(btnSound);
+  btnSpeak.onclick = ()=> toggleSpeak(btnSpeak);
+  btnLeft.onmousedown = ()=> paddle.dx = -paddle.speed;
+  btnRight.onmousedown = ()=> paddle.dx =  paddle.speed;
+  btnLeft.onmouseup = btnRight.onmouseup = ()=> paddle.dx = 0;
+  btnLeft.onmouseleave = btnRight.onmouseleave = ()=> paddle.dx = 0;
+
+  // ---- Mobil-dock-knapper ----
+  mStart.onclick = ()=> startGame();
+  mPause.onclick = ()=> togglePause();
+  mSound.onclick = ()=> toggleSound(mSound);
+  mSpeak.onclick = ()=> toggleSpeak(mSpeak);
+  mLeft.addEventListener('touchstart', e=>{ paddle.dx=-paddle.speed; e.preventDefault(); });
+  mRight.addEventListener('touchstart', e=>{ paddle.dx= paddle.speed; e.preventDefault(); });
+  const stopTouch=()=>{ paddle.dx=0; };
+  mLeft.addEventListener('touchend', stopTouch);
+  mRight.addEventListener('touchend', stopTouch);
+
+  function startGame(){
     score=0; level=1; lives=3; rows=5; ball.speedMul=1;
     scoreEl.textContent=score; levelEl.textContent=level; livesEl.textContent=lives;
     buildBricks(); resetBall(); running=true; paused=false;
     feedback.textContent = "Kickoff!";
-    const l = "Nå kjører vi, Bjørnar!";
-    say(l); showSign(l);
-  };
-  btnPause.onclick = ()=>{
+    say("Nå kjører vi!");
+  }
+  function togglePause(){
     if(!running) return;
     paused = !paused;
     feedback.textContent = paused?"Pause":"Tilbake i spill!";
-    if(!paused){ const l="Tilbake i spill, Bjørnar!"; say(l); showSign(l); }
-  };
-  btnSound.onclick = ()=>{ soundOn = !soundOn; btnSound.textContent = "Lyd: " + (soundOn ? "På" : "Av"); if(soundOn) tone(660,0.05); };
-  btnSpeak.onclick = ()=>{ speakOn = !speakOn; btnSpeak.textContent = "Tale: " + (speakOn ? "På" : "Av"); if(speakOn) { say("Tale aktivert"); showSign("Tale aktivert"); } };
+    if(!paused) say("Tilbake i spill!");
+  }
+  function toggleSound(el){
+    soundOn = !soundOn; el.textContent = "Lyd: " + (soundOn ? "På" : "Av");
+    if(el !== btnSound) btnSound.textContent = el.textContent;
+    if(el !== mSound) mSound.textContent = el.textContent;
+    if(soundOn) tone(660,0.05);
+  }
+  function toggleSpeak(el){
+    speakOn = !speakOn; el.textContent = "Tale: " + (speakOn ? "På" : "Av");
+    if(el !== btnSpeak) btnSpeak.textContent = el.textContent;
+    if(el !== mSpeak) mSpeak.textContent = el.textContent;
+    if(speakOn) { say("Tale aktivert"); showSign("Tale aktivert"); }
+  }
 
   // ---- Pepsi/Cola spice i tekst ----
   function spice(text){
@@ -355,13 +454,18 @@
     return text.replace(/Pepsi Max|Pepsi|Cola/gi, ()=>soda);
   }
 
-  // ---- Skaler brettet til 100vh (ingen scroll) ----
+  // ---- Skaler brettet så alt vises uten scroll ----
   function fitToViewport(){
-    const headerH = document.querySelector('header').offsetHeight || 54;
-    const stageH = window.innerHeight - headerH - 6;
-    const stageW = window.innerWidth - 12;
-    const s = Math.min(stageW / BASE_W, stageH / BASE_H);
-    wrap.style.transform = `scale(${s})`;
+    const headerH = document.querySelector('header').offsetHeight || 56;
+    const stageEl = document.getElementById('stage');
+    const toolVisible = window.innerWidth > 900; // toolbar eller dock?
+    const dockH = toolVisible ? 0 : (document.querySelector('.dock').offsetHeight || 0);
+    // Høyden tilgjengelig for canvasWrap + melding + liten margin
+    const extra = 28 /*msg*/ + 16 /*margins*/;
+    const availH = window.innerHeight - headerH - dockH - 20 - extra - (parseInt(getComputedStyle(stageEl).paddingTop)||0) - (parseInt(getComputedStyle(stageEl).paddingBottom)||0);
+    const availW = window.innerWidth - 24;
+    const s = Math.min(availW / BASE_W, availH / BASE_H);
+    wrap.style.transform = `scale(${Math.max(0.5, s)})`;
     wrap.style.height = BASE_H + "px";
     wrap.style.width  = BASE_W + "px";
   }
