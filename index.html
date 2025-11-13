@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Breakout for Bjørnar – Tippekupong-stemning</title>
+<title>Breakout – Tippekupong for Bjørnar</title>
 <style>
   :root{
     --bg:#0d1117; --panel:#161b22; --ink:#e6edf3; --muted:#9fb1d1;
@@ -11,7 +11,7 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,Segoe UI,Roboto,Arial}
-  body{overflow:hidden} /* ingen scrolling */
+  body{overflow:hidden}
   header{height:54px;display:flex;align-items:center;gap:10px;justify-content:center;
          background:var(--panel);border-bottom:1px solid var(--line);padding:6px 10px}
   h1{margin:0;font-size:16px}
@@ -30,8 +30,28 @@
   .soda.cola{background:var(--cola)}
   .touch{display:none;gap:8px;justify-content:center;margin-top:6px}
   .touch button{width:120px}
-  @media (pointer:coarse){
-    .touch{display:flex}
+  @media (pointer:coarse){ .touch{display:flex} }
+
+  /* Skilt (pop-up) */
+  .sign{
+    position:absolute; left:50%; top:46%;
+    transform:translate(-50%,-50%) scale(0.9);
+    background:rgba(16,21,29,0.95);
+    border:2px solid var(--line);
+    border-radius:14px;
+    padding:10px 16px;
+    font-weight:800; letter-spacing:0.2px;
+    text-align:center; white-space:nowrap;
+    box-shadow:0 8px 30px rgba(0,0,0,0.5);
+    animation:pop 900ms ease forwards;
+    pointer-events:none;
+  }
+  .sign small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+  @keyframes pop{
+    0%{opacity:0; transform:translate(-50%,-50%) scale(0.85)}
+    15%{opacity:1; transform:translate(-50%,-50%) scale(1.0)}
+    70%{opacity:1}
+    100%{opacity:0; transform:translate(-50%,-58%) scale(0.96)}
   }
 </style>
 </head>
@@ -53,9 +73,7 @@
 
 <div id="stage" aria-live="polite">
   <div id="canvasWrap">
-    <!-- Intern logikk tegner i 800x520; vi skalerer visuelt for å passe i vinduet -->
     <canvas id="game" width="800" height="520" aria-label="Breakout-brett"></canvas>
-    <!-- Pepsi/Cola dekorbånd -->
     <canvas id="ribbon" width="800" height="16" style="position:absolute;left:0;top:0;pointer-events:none"></canvas>
   </div>
   <div class="touch">
@@ -67,21 +85,21 @@
 
 <script>
 (()=>{
-  // ---- Konstanter ----
+  // ---- Spillnavn som skal sies ved treff ----
   const SPILL = ["Lotto","Vikinglotto","Nabolaget","Eurojackpot","Extra","Joker","Keno"];
 
-  // Oppmuntringer – alle inkluderer "Bjørnar"
+  // Oppmuntringer – kun mestring, alltid med "Bjørnar", aldri sammen med spillnavn
   const PRAISE = [
-    "Bjørnar, du er like kul som en tippekupong!",
-    "Bjørnar, for et treff! Pepsi Max-presisjon!",
-    "Bjørnar, Cola-kraft! Den satt!",
-    "Bjørnar, oddsen er på din side!",
-    "Bjørnar, dette er mesterlig kontroll!",
-    "Bjørnar, ren klasse!",
-    "Bjørnar, kupongen din går rett inn!",
-    "Bjørnar, helt nydelig spill!",
-    "Bjørnar, du eier brettet!",
-    "Bjørnar, vinnerflyt!"
+    "Bra jobba, Bjørnar!",
+    "Nydelig kontroll, Bjørnar!",
+    "Perfekt timing, Bjørnar!",
+    "Sterkt spilt, Bjørnar!",
+    "Fytti, dette sitter, Bjørnar!",
+    "Is i magen, Bjørnar!",
+    "Du eier brettet, Bjørnar!",
+    "Herlig flyt, Bjørnar!",
+    "Knallbra fokus, Bjørnar!",
+    "Kongejobb, Bjørnar!"
   ];
   let praiseBag = shuffle([...PRAISE]);
   const nextPraise = () => (praiseBag.length? praiseBag: (praiseBag = shuffle([...PRAISE]))).pop();
@@ -122,8 +140,16 @@
     if(!speakOn || !('speechSynthesis' in window)) return;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'nb-NO'; u.rate = 1.02; u.pitch = 1.0; u.volume = 1.0;
-    // Ikke avbryt hvis det nettopp snakker; la korte klipp køes
     window.speechSynthesis.speak(u);
+  }
+
+  // ---- Skilt (popups) ----
+  function showSign(main, sub=""){
+    const el = document.createElement('div');
+    el.className = 'sign';
+    el.innerHTML = main + (sub? `<small>${sub}</small>` : "");
+    wrap.appendChild(el);
+    setTimeout(()=> el.remove(), 950);
   }
 
   // ---- Spilltilstand ----
@@ -133,9 +159,9 @@
 
   let rows=5, cols=10, gap=6, brickH=22, bricks=[], colors=["#58a6ff","#39d353","#ff7b72","#d2a8ff","#f2cc60","#8b949e","#7ee787"];
 
-  // Periodisk personlig oppmuntring
+  // Periodisk personlig oppmuntring (kun mestring, ikke spillnavn)
   let lastCheer = 0;
-  const CHEER_INTERVAL = 5000; // minst hvert 5. sekund
+  const CHEER_INTERVAL = 5500; // min hvert 5.5 s
 
   function resetBall(){
     ball.x = paddle.x + paddle.w/2;
@@ -199,10 +225,11 @@
   function update(ts){
     if(paused || !running) return;
 
-    // Periodisk heiarop med navn
+    // Periodisk heiarop (uten spillnavn)
     if(!lastCheer) lastCheer = ts;
     if(ts - lastCheer >= CHEER_INTERVAL){
-      say(nextPraise());
+      const line = nextPraise();
+      say(line); showSign(line);
       lastCheer = ts;
     }
 
@@ -228,8 +255,7 @@
       ball.dx = speed * Math.sin(angle);
       ball.dy = -Math.abs(speed * Math.cos(angle));
       tone(800,0.05);
-      // Liten sjanse for ekstra heiarop ved god treffrytme
-      if(Math.random()<0.25) say("Bjørnar, perfekt timing!");
+      if(Math.random()<0.25){ const l = nextPraise(); say(l); showSign(l); lastCheer = ts; }
     }
 
     // brick-kollisjon
@@ -242,10 +268,14 @@
         ball.dy *= -1;
         tone(900,0.06);
 
-        // Si navnet på spillet og heie på Bjørnar
-        say(`Bjørnar – ${b.label}!`);
-        feedback.innerHTML = spice(`${b.label}! ${nextPraise()}`);
-        lastCheer = performance.now(); // reset så det ikke kommer to på rappen
+        // Si kun spillnavnet ved treff
+        say(b.label);
+        feedback.innerHTML = spice(`${b.label}!`);
+        // Separat mestringsrop (uten spillnavn)
+        if(Math.random()<0.7){
+          const l = nextPraise(); setTimeout(()=>{ say(l); showSign(l,"Fortsatt flyt!"); }, 220);
+          lastCheer = ts + 220;
+        }
         break;
       }
     }
@@ -254,12 +284,14 @@
     if(ball.y - ball.r > BASE_H){
       lives--; livesEl.textContent = lives; tone(200,0.2);
       if(lives<=0){
-        feedback.innerHTML = spice("Game over – Bjørnar, ny runde snart!");
-        say("Bjørnar, ny runde – du tar den neste!");
+        const l = "Ny runde, Bjørnar – dette tar du!";
+        feedback.innerHTML = spice("Game over – prøv igjen!");
+        say(l); showSign("Game over", "Trykk Start for ny runde");
         running=false;
       } else {
-        feedback.innerHTML = spice("Ny ball! Fokus, Bjørnar!");
-        say("Bjørnar, ny ball – på'n igjen!");
+        feedback.textContent = "Ny ball!";
+        const l = "På’n igjen, Bjørnar!";
+        say(l); showSign(l);
         resetBall();
       }
     }
@@ -269,8 +301,9 @@
       level++; levelEl.textContent = level;
       rows = Math.min(8, rows+1);
       ball.speedMul += 0.05;
-      feedback.innerHTML = spice(`Level ${level}! Cola-rakett!`);
-      say(`Bjørnar – level ${level}!`);
+      feedback.textContent = `Level ${level}!`;
+      const l = `Level ${level} – sterkt, Bjørnar!`;
+      say(l); showSign(`Level ${level}`, "Gå for gull!");
       buildBricks(); resetBall();
     }
   }
@@ -303,17 +336,18 @@
     score=0; level=1; lives=3; rows=5; ball.speedMul=1;
     scoreEl.textContent=score; levelEl.textContent=level; livesEl.textContent=lives;
     buildBricks(); resetBall(); running=true; paused=false;
-    feedback.textContent = "Kickoff! Kupongen er inne – kjør!";
-    say("Bjørnar, nå kjører vi!");
+    feedback.textContent = "Kickoff!";
+    const l = "Nå kjører vi, Bjørnar!";
+    say(l); showSign(l);
   };
   btnPause.onclick = ()=>{
     if(!running) return;
     paused = !paused;
     feedback.textContent = paused?"Pause":"Tilbake i spill!";
-    if(!paused) say("Bjørnar, tilbake i spill!");
+    if(!paused){ const l="Tilbake i spill, Bjørnar!"; say(l); showSign(l); }
   };
   btnSound.onclick = ()=>{ soundOn = !soundOn; btnSound.textContent = "Lyd: " + (soundOn ? "På" : "Av"); if(soundOn) tone(660,0.05); };
-  btnSpeak.onclick = ()=>{ speakOn = !speakOn; btnSpeak.textContent = "Tale: " + (speakOn ? "På" : "Av"); if(speakOn) say("Tale aktivert, Bjørnar!"); };
+  btnSpeak.onclick = ()=>{ speakOn = !speakOn; btnSpeak.textContent = "Tale: " + (speakOn ? "På" : "Av"); if(speakOn) { say("Tale aktivert"); showSign("Tale aktivert"); } };
 
   // ---- Pepsi/Cola spice i tekst ----
   function spice(text){
@@ -324,13 +358,12 @@
   // ---- Skaler brettet til 100vh (ingen scroll) ----
   function fitToViewport(){
     const headerH = document.querySelector('header').offsetHeight || 54;
-    const stageH = window.innerHeight - headerH - 6; // liten margin
+    const stageH = window.innerHeight - headerH - 6;
     const stageW = window.innerWidth - 12;
-    // Hvilken skala får hele canvas (800x520) til å passe?
-    const s = Math.min(stageW / BASE_W, stageH / (BASE_H + 0)); // +0: ribbon ligger oppå
+    const s = Math.min(stageW / BASE_W, stageH / BASE_H);
     wrap.style.transform = `scale(${s})`;
-    wrap.style.height = (BASE_H) + "px";
-    wrap.style.width  = (BASE_W) + "px";
+    wrap.style.height = BASE_H + "px";
+    wrap.style.width  = BASE_W + "px";
   }
   window.addEventListener('resize', fitToViewport);
 
