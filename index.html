@@ -13,7 +13,6 @@
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,Segoe UI,Roboto,Arial}
   body{overflow:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 
-  /* Toppfelt med ALWAYS-ON hurtigknapper */
   header{
     display:flex; align-items:center; justify-content:space-between; gap:16px;
     background:var(--panel); border-bottom:1px solid var(--line);
@@ -38,7 +37,6 @@
   #canvasWrap{position:relative; transform-origin:top center;}
   canvas{display:block; background:linear-gradient(180deg,#0b1220,#0a0f18); border-radius:12px; border:1px solid #112}
 
-  /* Verktøylinje under spillet (desktop/tablet) */
   .toolbar{
     display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;
     background:#10151d; border:1px solid var(--line); border-radius:12px; padding:8px 10px; width:min(960px,100%);
@@ -56,7 +54,6 @@
   .msg .soda{padding:2px 8px; border-radius:999px; margin:0 4px; color:#fff}
   .soda.pepsi{background:var(--pepsi)} .soda.cola{background:var(--cola)}
 
-  /* Skilt (pop-up) */
   .sign{
     position:absolute; left:50%; top:46%;
     transform:translate(-50%,-50%) scale(0.9);
@@ -73,39 +70,30 @@
     100%{opacity:0; transform:translate(-50%,-58%) scale(0.96)}
   }
 
-  /* Mobil-dock: fast nederst, store knapper */
   .dock{
     position:fixed; left:0; right:0; bottom:0;
     background:rgba(16,21,29,0.96); border-top:1px solid var(--line);
     padding:10px 12px calc(10px + env(safe-area-inset-bottom));
     display:none; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;
     box-shadow:0 -12px 28px rgba(0,0,0,0.35);
-    z-index:4; /* over canvas */
+    z-index:4;
   }
   .dock button{min-width:42%; padding:12px 14px; font-size:16px}
   .dock .row{display:flex; gap:10px; width:100%; justify-content:space-between}
   .dock .row.full{justify-content:center}
   .dock .wide{flex:1}
   .dock .move{min-width:48%}
-
-  /* Synlig på små skjermer */
-  @media (max-width: 900px){
-    .toolbar{display:none}
-    .dock{display:flex}
-  }
+  @media (max-width: 900px){.toolbar{display:none}.dock{display:flex}}
 </style>
 </head>
 <body>
 <header>
   <h1>Breakout for Bjørnar</h1>
-
   <div class="hud">
     <div class="stat">Poeng<br><b id="score">0</b></div>
     <div class="stat">Level<br><b id="level">1</b></div>
     <div class="stat">Liv<br><b id="lives">3</b></div>
   </div>
-
-  <!-- ALLTID VISIBLE hurtigknapper -->
   <div class="quick">
     <button id="hdrStart" class="primary">Start</button>
     <button id="hdrPause">Pause</button>
@@ -117,9 +105,7 @@
     <canvas id="game" width="800" height="520" aria-label="Breakout-brett"></canvas>
     <canvas id="ribbon" width="800" height="16" style="position:absolute;left:0;top:0;pointer-events:none"></canvas>
   </div>
-
-  <!-- Verktøylinje under spillet (skjules på mobil til fordel for dock) -->
-  <div class="toolbar" role="toolbar" aria-label="Spillkontroller">
+  <div class="toolbar">
     <div class="group">
       <button id="btnStart" class="primary">Start / Restart</button>
       <button id="btnPause">Pause</button>
@@ -133,12 +119,10 @@
       <button id="btnRight">Høyre ▶</button>
     </div>
   </div>
-
   <div id="feedback" class="msg"></div>
 </div>
 
-<!-- Mobil-dock (fast nederst) -->
-<div class="dock" role="toolbar" aria-label="Spillkontroller (mobil)">
+<div class="dock">
   <div class="row">
     <button id="mStart" class="primary wide">Start</button>
     <button id="mPause" class="wide">Pause</button>
@@ -155,363 +139,110 @@
 
 <script>
 (()=>{
-  // ---- Spillnavn som sies ved treff ----
-  const SPILL = ["Lotto","Vikinglotto","Nabolaget","Eurojackpot","Extra","Joker","Keno"];
-
-  // Oppmuntringer – kun mestring, alltid med "Bjørnar"
-  const PRAISE = [
+  const SPILL=["Lotto","Vikinglotto","Nabolaget","Eurojackpot","Extra","Joker","Keno"];
+  const PRAISE=[
     "Bra jobba, Bjørnar!","Nydelig kontroll, Bjørnar!","Perfekt timing, Bjørnar!","Sterkt spilt, Bjørnar!",
     "Is i magen, Bjørnar!","Du eier brettet, Bjørnar!","Herlig flyt, Bjørnar!","Knallbra fokus, Bjørnar!",
     "Kongejobb, Bjørnar!","Dette sitter, Bjørnar!"
   ];
-  let praiseBag = shuffle([...PRAISE]);
-  const nextPraise = () => (praiseBag.length? praiseBag: (praiseBag = shuffle([...PRAISE]))).pop();
+  let praiseBag=shuffle([...PRAISE]);
+  const nextPraise=()=> (praiseBag.length?praiseBag:(praiseBag=shuffle([...PRAISE]))).pop();
 
-  // ---- DOM / Canvas ----
-  const cvs = document.getElementById('game');
-  const ctx = cvs.getContext('2d');
-  const ribbon = document.getElementById('ribbon');
-  const rctx = ribbon.getContext('2d');
-  const wrap = document.getElementById('canvasWrap');
+  const cvs=document.getElementById('game'),ctx=cvs.getContext('2d');
+  const ribbon=document.getElementById('ribbon'),rctx=ribbon.getContext('2d');
+  const wrap=document.getElementById('canvasWrap');
+  const scoreEl=document.getElementById('score'),levelEl=document.getElementById('level'),livesEl=document.getElementById('lives');
+  const feedback=document.getElementById('feedback');
+  const hdrStart=hdrPause=document.getElementById('hdrStart');
+  const hdrPauseBtn=document.getElementById('hdrPause');
+  const btnStart=document.getElementById('btnStart'),btnPause=document.getElementById('btnPause'),
+        btnSound=document.getElementById('btnSound'),btnSpeak=document.getElementById('btnSpeak'),
+        btnLeft=document.getElementById('btnLeft'),btnRight=document.getElementById('btnRight');
+  const mStart=document.getElementById('mStart'),mPause=document.getElementById('mPause'),
+        mSound=document.getElementById('mSound'),mSpeak=document.getElementById('mSpeak'),
+        mLeft=document.getElementById('mLeft'),mRight=document.getElementById('mRight');
+  const BASE_W=800,BASE_H=520;
 
-  const scoreEl = document.getElementById('score');
-  const levelEl = document.getElementById('level');
-  const livesEl = document.getElementById('lives');
-  const feedback = document.getElementById('feedback');
+  let audioCtx,soundOn=false,speakOn=true;
+  function tone(f=880,d=0.06){if(!soundOn)return;if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='square';o.frequency.value=f;g.gain.value=0.07;
+    o.connect(g);g.connect(audioCtx.destination);o.start();setTimeout(()=>o.stop(),d*1000);}
+  function say(t){if(!speakOn||!('speechSynthesis'in window))return;const u=new SpeechSynthesisUtterance(t);
+    u.lang='nb-NO';u.rate=1.02;u.pitch=1.0;window.speechSynthesis.speak(u);}
+  function showSign(main,sub=""){const e=document.createElement('div');e.className='sign';e.innerHTML=main+(sub?`<small>${sub}</small>`:"");
+    wrap.appendChild(e);setTimeout(()=>e.remove(),950);}
 
-  // Header hurtigknapper
-  const hdrStart = document.getElementById('hdrStart');
-  const hdrPause = document.getElementById('hdrPause');
+  let score=0,lives=3,level=1,paused=false,running=false;
+  const paddle={w:110,h:14,x:(BASE_W-110)/2,y:BASE_H-30,vx:0};
+  const keys={left:false,right:false};
+  const ball={x:BASE_W/2,y:BASE_H-60,r:8,dx:4,dy:-4,speedMul:1};
+  let rows=5,cols=10,gap=6,brickH=22,bricks=[],colors=["#58a6ff","#39d353","#ff7b72","#d2a8ff","#f2cc60","#8b949e","#7ee787"];
+  let lastCheer=0;const CHEER_INTERVAL=5500;
 
-  // Desktop-knapper
-  const btnStart = document.getElementById('btnStart');
-  const btnPause = document.getElementById('btnPause');
-  const btnSound = document.getElementById('btnSound');
-  const btnSpeak = document.getElementById('btnSpeak');
-  const btnLeft = document.getElementById('btnLeft');
-  const btnRight = document.getElementById('btnRight');
+  function resetBall(){ball.x=paddle.x+paddle.w/2;ball.y=paddle.y-12;
+    const ang=(Math.random()*0.6+0.2)*Math.PI,s=5+level*0.5;
+    ball.dx=Math.cos(ang)*(Math.random()<0.5?-s:s);ball.dy=-Math.abs(Math.sin(ang)*s);}
+  function buildBricks(){bricks=[];const totalGapX=(cols+1)*gap,bw=Math.floor((BASE_W-totalGapX)/cols),top=80;let i=0;
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const x=gap+c*(bw+gap),y=top+r*(brickH+gap),label=SPILL[i%SPILL.length];i++;
+      bricks.push({x,y,w:bw,h:brickH,alive:true,color:colors[r%colors.length],label});}}
+  function roundRect(c,x,y,w,h,r,f=1){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);
+    c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);if(f)c.fill();}
+  function drawRibbon(){rctx.clearRect(0,0,BASE_W,16);rctx.fillStyle="#1e2a78";rctx.fillRect(0,0,BASE_W,8);
+    rctx.fillStyle="#b30000";rctx.fillRect(0,8,BASE_W,8);}
+  function draw(){ctx.clearRect(0,0,BASE_W,BASE_H);
+    ctx.font="12px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";
+    bricks.forEach(b=>{if(!b.alive)return;ctx.fillStyle=b.color;roundRect(ctx,b.x,b.y,b.w,b.h,6);
+      ctx.fillStyle="#0b1020";ctx.fillText(b.label,b.x+b.w/2,b.y+b.h/2);});
+    ctx.fillStyle="#0ef";roundRect(ctx,paddle.x,paddle.y,paddle.w,paddle.h,8);
+    const g=ctx.createRadialGradient(ball.x-3,ball.y-3,2,ball.x,ball.y,12);
+    g.addColorStop(0,"#fff");g.addColorStop(1,"#58a6ff");
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();}
 
-  // Mobil-dock-knapper
-  const mStart = document.getElementById('mStart');
-  const mPause = document.getElementById('mPause');
-  const mSound = document.getElementById('mSound');
-  const mSpeak = document.getElementById('mSpeak');
-  const mLeft = document.getElementById('mLeft');
-  const mRight = document.getElementById('mRight');
+  function update(now,dt){
+    if(paused||!running)return;
+    if(!lastCheer)lastCheer=now;
+    if(now-lastCheer>=CHEER_INTERVAL){const line=nextPraise();say(line);showSign(line);lastCheer=now;}
 
-  const BASE_W = 800, BASE_H = 520;
-
-  // ---- Lyd & Tale ----
-  let audioCtx, soundOn = false;
-  let speakOn = true;
-  function tone(freq=880, dur=0.06){
-    if(!soundOn) return;
-    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.type='square'; o.frequency.value=freq; g.gain.value=0.07;
-    o.connect(g); g.connect(audioCtx.destination); o.start();
-    setTimeout(()=>o.stop(), dur*1000);
-  }
-  function say(text){
-    if(!speakOn || !('speechSynthesis' in window)) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'nb-NO'; u.rate = 1.02; u.pitch = 1.0; u.volume = 1.0;
-    window.speechSynthesis.speak(u);
-  }
-
-  // ---- Skilt (popups) ----
-  function showSign(main, sub=""){
-    const el = document.createElement('div');
-    el.className = 'sign';
-    el.innerHTML = main + (sub? `<small>${sub}</small>` : "");
-    wrap.appendChild(el);
-    setTimeout(()=> el.remove(), 950);
-  }
-
-  // ---- Spilltilstand ----
-  let score=0, lives=3, level=1, paused=false, running=false;
-  const paddle = { w: 110, h: 14, x: (BASE_W-110)/2, y: BASE_H-30, speed: 8, vx: 0 };
-  const keys = { left:false, right:false };
-
-  const ball = { x: BASE_W/2, y: BASE_H-60, r: 8, dx:4, dy:-4, speedMul:1 };
-
-  let rows=5, cols=10, gap=6, brickH=22, bricks=[], colors=["#58a6ff","#39d353","#ff7b72","#d2a8ff","#f2cc60","#8b949e","#7ee787"];
-
-  // Periodisk personlig oppmuntring
-  let lastCheer = 0;
-  const CHEER_INTERVAL = 5500; // min hvert 5.5 s
-
-  function resetBall(){
-    ball.x = paddle.x + paddle.w/2;
-    ball.y = paddle.y - 12;
-    const angle = (Math.random()*0.6 + 0.2) * Math.PI; // 36–144°
-    const speed = 5 + level*0.5;
-    ball.dx = Math.cos(angle) * (Math.random()<0.5? -speed : speed);
-    ball.dy = -Math.abs(Math.sin(angle) * speed);
-  }
-
-  function buildBricks(){
-    bricks = [];
-    const totalGapX = (cols+1)*gap;
-    const bw = Math.floor((BASE_W - totalGapX)/cols);
-    const top = 80;
-    let i=0;
-    for(let r=0;r<rows;r++){
-      for(let c=0;c<cols;c++){
-        const x = gap + c*(bw+gap);
-        const y = top + r*(brickH+gap);
-        const label = SPILL[i % SPILL.length]; i++;
-        bricks.push({x,y,w:bw,h:brickH,alive:true,color:colors[r%colors.length],label});
-      }
+    // --- ny, mer responsiv bevegelse ---
+    const ACC=2800,FRI=3600,MAX=820;
+    if(keys.left)paddle.vx-=ACC*dt;
+    if(keys.right)paddle.vx+=ACC*dt;
+    if(!keys.left&&!keys.right){
+      if(paddle.vx>0)paddle.vx=Math.max(0,paddle.vx-FRI*dt);
+      else if(paddle.vx<0)paddle.vx=Math.min(0,paddle.vx+FRI*dt);
     }
-  }
+    if(Math.abs(paddle.vx)<40)paddle.vx=0;
+    paddle.vx=Math.max(-MAX,Math.min(MAX,paddle.vx));
+    paddle.x+=paddle.vx*dt;
+    if(paddle.x<0){paddle.x=0;paddle.vx=0;}
+    if(paddle.x>BASE_W-paddle.w){paddle.x=BASE_W-paddle.w;paddle.vx=0;}
 
-  function roundRect(ctx,x,y,w,h,r,fill=true){
-    ctx.beginPath();
-    ctx.moveTo(x+r,y);
-    ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r);
-    ctx.arcTo(x,y,x+w,y,r);
-    if(fill) ctx.fill();
-  }
+    ball.x+=ball.dx*ball.speedMul;ball.y+=ball.dy*ball.speedMul;
+    if(ball.x-ball.r<0){ball.x=ball.r;ball.dx*=-1;tone(500);}
+    if(ball.x+ball.r>BASE_W){ball.x=BASE_W-ball.r;ball.dx*=-1;tone(520);}
+    if(ball.y-ball.r<0){ball.y=ball.r;ball.dy*=-1;tone(540);}
 
-  function drawRibbon(){
-    rctx.clearRect(0,0,BASE_W,16);
-    rctx.fillStyle = "#1e2a78"; rctx.fillRect(0,0,BASE_W,8);   // Pepsi Max
-    rctx.fillStyle = "#b30000"; rctx.fillRect(0,8,BASE_W,8);   // Cola
-  }
-
-  function draw(){
-    ctx.clearRect(0,0,BASE_W,BASE_H);
-    // bricks
-    ctx.font = "12px system-ui,Segoe UI,Roboto,Arial";
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    bricks.forEach(b=>{
-      if(!b.alive) return;
-      ctx.fillStyle = b.color; roundRect(ctx,b.x,b.y,b.w,b.h,6);
-      ctx.fillStyle = "#0b1020"; ctx.fillText(b.label, b.x + b.w/2, b.y + b.h/2);
-    });
-    // paddle
-    ctx.fillStyle="#0ef"; roundRect(ctx,paddle.x,paddle.y,paddle.w,paddle.h,8);
-    // ball
-    const g = ctx.createRadialGradient(ball.x-3,ball.y-3,2,ball.x,ball.y,12);
-    g.addColorStop(0,"#fff"); g.addColorStop(1,"#58a6ff");
-    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fill();
-  }
-
-  function update(now, dt){
-    if(paused || !running) return;
-
-    // Periodisk heiarop (uten spillnavn)
-    if(!lastCheer) lastCheer = now;
-    if(now - lastCheer >= CHEER_INTERVAL){
-      const line = nextPraise();
-      say(line); showSign(line);
-      lastCheer = now;
-    }
-
-    // ---- Glatt paddelbevegelse (tidsbasert) ----
-    const ACC = 2400;  // px/s^2
-    const FRI = 1800;  // px/s^2
-    const MAX = 900;   // px/s
-    if(keys.left)  paddle.vx -= ACC * dt;
-    if(keys.right) paddle.vx += ACC * dt;
-    if(!keys.left && !keys.right){
-      if(paddle.vx > 0){ paddle.vx = Math.max(0, paddle.vx - FRI*dt); }
-      else if(paddle.vx < 0){ paddle.vx = Math.min(0, paddle.vx + FRI*dt); }
-    }
-    paddle.vx = Math.max(-MAX, Math.min(MAX, paddle.vx));
-    paddle.x += paddle.vx * dt;
-    if(paddle.x < 0){ paddle.x = 0; paddle.vx = 0; }
-    if(paddle.x > BASE_W - paddle.w){ paddle.x = BASE_W - paddle.w; paddle.vx = 0; }
-
-    // ball
-    ball.x += ball.dx * ball.speedMul;
-    ball.y += ball.dy * ball.speedMul;
-
-    // vegger
-    if(ball.x - ball.r < 0){ ball.x = ball.r; ball.dx*=-1; tone(500); }
-    if(ball.x + ball.r > BASE_W){ ball.x = BASE_W - ball.r; ball.dx*=-1; tone(520); }
-    if(ball.y - ball.r < 0){ ball.y = ball.r; ball.dy*=-1; tone(540); }
-
-    // paddle-kollisjon
-    if(ball.y + ball.r >= paddle.y && ball.y + ball.r <= paddle.y + paddle.h &&
-       ball.x >= paddle.x && ball.x <= paddle.x + paddle.w && ball.dy>0){
-      const hit = (ball.x - (paddle.x + paddle.w/2))/(paddle.w/2);
-      const speed = Math.hypot(ball.dx, ball.dy)*1.02;
-      const angle = hit * (Math.PI/3);
-      ball.dx = speed * Math.sin(angle);
-      ball.dy = -Math.abs(speed * Math.cos(angle));
+    if(ball.y+ball.r>=paddle.y&&ball.y+ball.r<=paddle.y+paddle.h&&ball.x>=paddle.x&&ball.x<=paddle.x+paddle.w&&ball.dy>0){
+      const hit=(ball.x-(paddle.x+paddle.w/2))/(paddle.w/2);
+      const speed=Math.hypot(ball.dx,ball.dy)*1.02;
+      const ang=hit*(Math.PI/3);
+      ball.dx=speed*Math.sin(ang);ball.dy=-Math.abs(speed*Math.cos(ang));
       tone(800,0.05);
-      if(Math.random()<0.25){ const l = nextPraise(); say(l); showSign(l); lastCheer = now; }
+      if(Math.random()<0.25){const l=nextPraise();say(l);showSign(l);lastCheer=now;}
     }
 
-    // brick-kollisjon
     for(const b of bricks){
-      if(!b.alive) continue;
-      if(ball.x > b.x && ball.x < b.x + b.w && ball.y > b.y && ball.y < b.y + b.h){
-        b.alive = false;
-        score += 10; scoreEl.textContent = score;
-        ball.dy *= -1; tone(900,0.06);
-
-        // Si kun spillnavnet ved treff
-        say(b.label);
-        feedback.innerHTML = spice(`${b.label}!`);
-        // Separat mestringsrop (uten spillnavn)
-        if(Math.random()<0.7){
-          const l = nextPraise(); setTimeout(()=>{ say(l); showSign(l,"Fortsatt flyt!"); }, 220);
-          lastCheer = now + 220;
-        }
+      if(!b.alive)continue;
+      if(ball.x>b.x&&ball.x<b.x+b.w&&ball.y>b.y&&ball.y<b.y+b.h){
+        b.alive=false;score+=10;scoreEl.textContent=score;ball.dy*=-1;tone(900,0.06);
+        say(b.label);feedback.innerHTML=spice(`${b.label}!`);
+        if(Math.random()<0.7){const l=nextPraise();setTimeout(()=>{say(l);showSign(l,"Fortsatt flyt!");},220);lastCheer=now+220;}
         break;
       }
     }
 
-    // liv tapt
-    if(ball.y - ball.r > BASE_H){
-      lives--; livesEl.textContent = lives; tone(200,0.2);
-      if(lives<=0){
-        feedback.innerHTML = spice("Game over – prøv igjen!");
-        say("Ny runde, Bjørnar – dette tar du!");
-        showSign("Game over","Trykk Start for ny runde");
-        running=false;
-      } else {
-        feedback.textContent = "Ny ball!";
-        say("På’n igjen, Bjørnar!");
-        showSign("Ny ball!");
-        resetBall();
-      }
-    }
-
-    // level clear
-    if(bricks.every(b=>!b.alive)){
-      level++; levelEl.textContent = level;
-      rows = Math.min(8, rows+1);
-      ball.speedMul += 0.05;
-      feedback.textContent = `Level ${level}!`;
-      say(`Level ${level}`);
-      showSign(`Level ${level}`, "Gå for gull!");
-      buildBricks(); resetBall();
-    }
-  }
-
-  // ---- Tast & piltaster (setter keystate) ----
-  document.addEventListener('keydown', e=>{
-    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A'){ keys.left = true; e.preventDefault(); }
-    if(e.key==='ArrowRight'|| e.key==='d' || e.key==='D'){ keys.right = true; e.preventDefault(); }
-    if(e.key===' '){ paused = !paused; feedback.textContent = paused?"Pause":"Spill i gang!"; }
-  });
-  document.addEventListener('keyup', e=>{
-    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A'){ keys.left = false; }
-    if(e.key==='ArrowRight'|| e.key==='d' || e.key==='D'){ keys.right = false; }
-  });
-
-  // ---- Pek/drag-styring direkte på canvas (mobilvennlig) ----
-  let dragging = false;
-  function setFromEvt(evt){
-    const rect = cvs.getBoundingClientRect();
-    const x = (evt.touches? evt.touches[0].clientX : evt.clientX) - rect.left;
-    const scale = rect.width / BASE_W; // konverter fra skjerm til canvas-koordinater
-    const cx = x / scale;
-    // Når vi drar direkte, “overstyr” tast-input for øyeblikket
-    keys.left = keys.right = false;
-    paddle.vx = 0;
-    paddle.x = Math.max(0, Math.min(BASE_W - paddle.w, cx - paddle.w/2));
-  }
-  cvs.addEventListener('pointerdown', e=>{ dragging=true; setFromEvt(e); });
-  cvs.addEventListener('pointermove', e=>{ if(dragging) setFromEvt(e); });
-  window.addEventListener('pointerup', ()=> dragging=false);
-  cvs.addEventListener('touchstart', e=>{ setFromEvt(e); }, {passive:false});
-  cvs.addEventListener('touchmove', e=>{ setFromEvt(e); }, {passive:false});
-
-  // ---- Knappe-bindinger (header, toolbar, dock) ----
-  // Start
-  hdrStart.onclick = btnStart.onclick = mStart.onclick = ()=> startGame();
-  // Pause
-  hdrPause.onclick = btnPause.onclick = mPause.onclick = ()=> togglePause();
-  // Lyd
-  btnSound.onclick = mSound.onclick = ()=> toggleSound();
-  // Tale
-  btnSpeak.onclick = mSpeak.onclick = ()=> toggleSpeak();
-  // Venstre/høyre (desktop-knapper -> keystate)
-  btnLeft.onmousedown = ()=> { keys.left = true; };
-  btnRight.onmousedown = ()=> { keys.right = true; };
-  btnLeft.onmouseup = btnRight.onmouseup = ()=> { keys.left = false; keys.right = false; };
-  btnLeft.onmouseleave = btnRight.onmouseleave = ()=> { keys.left = false; keys.right = false; };
-  // Venstre/høyre (mobil-dock -> keystate)
-  mLeft.addEventListener('touchstart', e=>{ keys.left=true; e.preventDefault(); });
-  mRight.addEventListener('touchstart', e=>{ keys.right=true; e.preventDefault(); });
-  const stopTouch=()=>{ keys.left=false; keys.right=false; };
-  mLeft.addEventListener('touchend', stopTouch);
-  mRight.addEventListener('touchend', stopTouch);
-
-  function startGame(){
-    score=0; level=1; lives=3; rows=5; ball.speedMul=1;
-    paddle.vx = 0; keys.left = keys.right = false;
-    scoreEl.textContent=score; levelEl.textContent=level; livesEl.textContent=lives;
-    buildBricks(); resetBall(); running=true; paused=false;
-    feedback.textContent = "Kickoff!";
-    say("Nå kjører vi!");
-  }
-  function togglePause(){
-    if(!running) return;
-    paused = !paused;
-    feedback.textContent = paused?"Pause":"Tilbake i spill!";
-    if(!paused) say("Tilbake i spill!");
-  }
-  function toggleSound(){
-    soundOn = !soundOn;
-    const t = "Lyd: " + (soundOn ? "På" : "Av");
-    btnSound.textContent = t; mSound.textContent = t;
-    if(soundOn) tone(660,0.05);
-  }
-  function toggleSpeak(){
-    speakOn = !speakOn;
-    const t = "Tale: " + (speakOn ? "På" : "Av");
-    btnSpeak.textContent = t; mSpeak.textContent = t;
-    if(speakOn) { say("Tale aktivert"); showSign("Tale aktivert"); }
-  }
-
-  // ---- Pepsi/Cola spice i tekst ----
-  function spice(text){
-    const soda = Math.random()<0.5 ? '<span class="soda pepsi">Pepsi&nbsp;Max</span>' : '<span class="soda cola">Cola</span>';
-    return text.replace(/Pepsi Max|Pepsi|Cola/gi, ()=>soda);
-  }
-
-  // ---- Skaler brettet så alt vises uten scroll ----
-  function fitToViewport(){
-    const headerH = document.querySelector('header').offsetHeight || 56;
-    const toolVisible = window.innerWidth > 900; // toolbar eller dock?
-    const dockH = toolVisible ? 0 : (document.querySelector('.dock').offsetHeight || 0);
-    const extra = 28 /*msg*/ + 16 /*margins*/;
-    const availH = window.innerHeight - headerH - dockH - 20 - extra;
-    const availW = window.innerWidth - 24;
-    const s = Math.min(availW / BASE_W, availH / BASE_H);
-    wrap.style.transform = `scale(${Math.max(0.5, s)})`;
-    wrap.style.height = BASE_H + "px";
-    wrap.style.width  = BASE_W + "px";
-  }
-  window.addEventListener('resize', fitToViewport);
-
-  // ---- Init + tidsbasert loop ----
-  drawRibbon();
-  buildBricks();
-  resetBall();
-  fitToViewport();
-
-  let prev = performance.now();
-  function loop(now){
-    const dt = Math.min(0.033, (now - prev) / 1000); // max 33ms for stabilitet
-    prev = now;
-    draw();
-    update(now, dt);
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
-
-  // ---- Utils ----
-  function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
-})();
-</script>
-</body>
-</html>
+    if(ball.y-ball.r>BASE_H){
+      lives--;livesEl.textContent=lives;tone(200,0.2);
+      if(lives<=0){feedback.innerHTML=spice("Game over – prøv igjen!");
+        say("Ny runde, Bjørnar – dette tar du!");showSign("Game over","Trykk Start for ny runde");running=false;}
+      else{
