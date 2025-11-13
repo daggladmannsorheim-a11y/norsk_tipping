@@ -13,7 +13,7 @@
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,Segoe UI,Roboto,Arial}
   body{overflow:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 
-  /* Toppfelt: nå med ALWAYS-ON hurtigknapper */
+  /* Toppfelt med ALWAYS-ON hurtigknapper */
   header{
     display:flex; align-items:center; justify-content:space-between; gap:16px;
     background:var(--panel); border-bottom:1px solid var(--line);
@@ -23,8 +23,6 @@
   .hud{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .stat{background:#10151d;border:1px solid var(--line);padding:6px 10px;border-radius:10px;min-width:96px;text-align:center}
   .stat b{font-size:18px}
-
-  /* Hurtigknapper i header (alltid synlige) */
   .quick{display:flex; gap:8px; flex-wrap:wrap}
   .quick button{
     cursor:pointer; border:1px solid var(--line); background:#0f1622; color:var(--ink);
@@ -232,7 +230,9 @@
 
   // ---- Spilltilstand ----
   let score=0, lives=3, level=1, paused=false, running=false;
-  const paddle = { w: 110, h: 14, x: (BASE_W-110)/2, y: BASE_H-30, speed: 8, dx:0 };
+  const paddle = { w: 110, h: 14, x: (BASE_W-110)/2, y: BASE_H-30, speed: 8, vx: 0 };
+  const keys = { left:false, right:false };
+
   const ball = { x: BASE_W/2, y: BASE_H-60, r: 8, dx:4, dy:-4, speedMul:1 };
 
   let rows=5, cols=10, gap=6, brickH=22, bricks=[], colors=["#58a6ff","#39d353","#ff7b72","#d2a8ff","#f2cc60","#8b949e","#7ee787"];
@@ -300,20 +300,31 @@
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fill();
   }
 
-  function update(ts){
+  function update(now, dt){
     if(paused || !running) return;
 
     // Periodisk heiarop (uten spillnavn)
-    if(!lastCheer) lastCheer = ts;
-    if(ts - lastCheer >= CHEER_INTERVAL){
+    if(!lastCheer) lastCheer = now;
+    if(now - lastCheer >= CHEER_INTERVAL){
       const line = nextPraise();
       say(line); showSign(line);
-      lastCheer = ts;
+      lastCheer = now;
     }
 
-    // paddle
-    paddle.x += paddle.dx;
-    paddle.x = Math.max(0, Math.min(BASE_W - paddle.w, paddle.x));
+    // ---- Glatt paddelbevegelse (tidsbasert) ----
+    const ACC = 2400;  // px/s^2
+    const FRI = 1800;  // px/s^2
+    const MAX = 900;   // px/s
+    if(keys.left)  paddle.vx -= ACC * dt;
+    if(keys.right) paddle.vx += ACC * dt;
+    if(!keys.left && !keys.right){
+      if(paddle.vx > 0){ paddle.vx = Math.max(0, paddle.vx - FRI*dt); }
+      else if(paddle.vx < 0){ paddle.vx = Math.min(0, paddle.vx + FRI*dt); }
+    }
+    paddle.vx = Math.max(-MAX, Math.min(MAX, paddle.vx));
+    paddle.x += paddle.vx * dt;
+    if(paddle.x < 0){ paddle.x = 0; paddle.vx = 0; }
+    if(paddle.x > BASE_W - paddle.w){ paddle.x = BASE_W - paddle.w; paddle.vx = 0; }
 
     // ball
     ball.x += ball.dx * ball.speedMul;
@@ -333,7 +344,7 @@
       ball.dx = speed * Math.sin(angle);
       ball.dy = -Math.abs(speed * Math.cos(angle));
       tone(800,0.05);
-      if(Math.random()<0.25){ const l = nextPraise(); say(l); showSign(l); lastCheer = ts; }
+      if(Math.random()<0.25){ const l = nextPraise(); say(l); showSign(l); lastCheer = now; }
     }
 
     // brick-kollisjon
@@ -350,7 +361,7 @@
         // Separat mestringsrop (uten spillnavn)
         if(Math.random()<0.7){
           const l = nextPraise(); setTimeout(()=>{ say(l); showSign(l,"Fortsatt flyt!"); }, 220);
-          lastCheer = ts + 220;
+          lastCheer = now + 220;
         }
         break;
       }
@@ -384,19 +395,15 @@
     }
   }
 
-  function loop(ts){
-    draw(); update(ts||0);
-    requestAnimationFrame(loop);
-  }
-
-  // ---- Tast & piltaster ----
+  // ---- Tast & piltaster (setter keystate) ----
   document.addEventListener('keydown', e=>{
-    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A'){ paddle.dx = -paddle.speed; e.preventDefault(); }
-    if(e.key==='ArrowRight'|| e.key==='d' || e.key==='D'){ paddle.dx =  paddle.speed; e.preventDefault(); }
+    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A'){ keys.left = true; e.preventDefault(); }
+    if(e.key==='ArrowRight'|| e.key==='d' || e.key==='D'){ keys.right = true; e.preventDefault(); }
     if(e.key===' '){ paused = !paused; feedback.textContent = paused?"Pause":"Spill i gang!"; }
   });
   document.addEventListener('keyup', e=>{
-    if(['ArrowLeft','a','A','ArrowRight','d','D'].includes(e.key)){ paddle.dx = 0; }
+    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A'){ keys.left = false; }
+    if(e.key==='ArrowRight'|| e.key==='d' || e.key==='D'){ keys.right = false; }
   });
 
   // ---- Pek/drag-styring direkte på canvas (mobilvennlig) ----
@@ -406,6 +413,9 @@
     const x = (evt.touches? evt.touches[0].clientX : evt.clientX) - rect.left;
     const scale = rect.width / BASE_W; // konverter fra skjerm til canvas-koordinater
     const cx = x / scale;
+    // Når vi drar direkte, “overstyr” tast-input for øyeblikket
+    keys.left = keys.right = false;
+    paddle.vx = 0;
     paddle.x = Math.max(0, Math.min(BASE_W - paddle.w, cx - paddle.w/2));
   }
   cvs.addEventListener('pointerdown', e=>{ dragging=true; setFromEvt(e); });
@@ -414,29 +424,30 @@
   cvs.addEventListener('touchstart', e=>{ setFromEvt(e); }, {passive:false});
   cvs.addEventListener('touchmove', e=>{ setFromEvt(e); }, {passive:false});
 
-  // ---- Knappe-bindinger (alle tre steder: header, toolbar, dock) ----
-  // start
+  // ---- Knappe-bindinger (header, toolbar, dock) ----
+  // Start
   hdrStart.onclick = btnStart.onclick = mStart.onclick = ()=> startGame();
-  // pause
+  // Pause
   hdrPause.onclick = btnPause.onclick = mPause.onclick = ()=> togglePause();
-  // lyd
-  btnSound.onclick = mSound.onclick = ()=> toggleSound(btnSound, mSound);
-  // tale
-  btnSpeak.onclick = mSpeak.onclick = ()=> toggleSpeak(btnSpeak, mSpeak);
-  // venstre/høyre (desktop)
-  btnLeft.onmousedown = ()=> paddle.dx = -paddle.speed;
-  btnRight.onmousedown = ()=> paddle.dx =  paddle.speed;
-  btnLeft.onmouseup = btnRight.onmouseup = ()=> paddle.dx = 0;
-  btnLeft.onmouseleave = btnRight.onmouseleave = ()=> paddle.dx = 0;
-  // venstre/høyre (mobil)
-  mLeft.addEventListener('touchstart', e=>{ paddle.dx=-paddle.speed; e.preventDefault(); });
-  mRight.addEventListener('touchstart', e=>{ paddle.dx= paddle.speed; e.preventDefault(); });
-  const stopTouch=()=>{ paddle.dx=0; };
+  // Lyd
+  btnSound.onclick = mSound.onclick = ()=> toggleSound();
+  // Tale
+  btnSpeak.onclick = mSpeak.onclick = ()=> toggleSpeak();
+  // Venstre/høyre (desktop-knapper -> keystate)
+  btnLeft.onmousedown = ()=> { keys.left = true; };
+  btnRight.onmousedown = ()=> { keys.right = true; };
+  btnLeft.onmouseup = btnRight.onmouseup = ()=> { keys.left = false; keys.right = false; };
+  btnLeft.onmouseleave = btnRight.onmouseleave = ()=> { keys.left = false; keys.right = false; };
+  // Venstre/høyre (mobil-dock -> keystate)
+  mLeft.addEventListener('touchstart', e=>{ keys.left=true; e.preventDefault(); });
+  mRight.addEventListener('touchstart', e=>{ keys.right=true; e.preventDefault(); });
+  const stopTouch=()=>{ keys.left=false; keys.right=false; };
   mLeft.addEventListener('touchend', stopTouch);
   mRight.addEventListener('touchend', stopTouch);
 
   function startGame(){
     score=0; level=1; lives=3; rows=5; ball.speedMul=1;
+    paddle.vx = 0; keys.left = keys.right = false;
     scoreEl.textContent=score; levelEl.textContent=level; livesEl.textContent=lives;
     buildBricks(); resetBall(); running=true; paused=false;
     feedback.textContent = "Kickoff!";
@@ -448,13 +459,13 @@
     feedback.textContent = paused?"Pause":"Tilbake i spill!";
     if(!paused) say("Tilbake i spill!");
   }
-  function toggleSound(elA, elB){
+  function toggleSound(){
     soundOn = !soundOn;
     const t = "Lyd: " + (soundOn ? "På" : "Av");
     btnSound.textContent = t; mSound.textContent = t;
     if(soundOn) tone(660,0.05);
   }
-  function toggleSpeak(elA, elB){
+  function toggleSpeak(){
     speakOn = !speakOn;
     const t = "Tale: " + (speakOn ? "På" : "Av");
     btnSpeak.textContent = t; mSpeak.textContent = t;
@@ -470,12 +481,10 @@
   // ---- Skaler brettet så alt vises uten scroll ----
   function fitToViewport(){
     const headerH = document.querySelector('header').offsetHeight || 56;
-    const stageEl = document.getElementById('stage');
     const toolVisible = window.innerWidth > 900; // toolbar eller dock?
     const dockH = toolVisible ? 0 : (document.querySelector('.dock').offsetHeight || 0);
     const extra = 28 /*msg*/ + 16 /*margins*/;
-    const availH = window.innerHeight - headerH - dockH - 20 - extra
-      - (parseInt(getComputedStyle(stageEl).paddingTop)||0) - (parseInt(getComputedStyle(stageEl).paddingBottom)||0);
+    const availH = window.innerHeight - headerH - dockH - 20 - extra;
     const availW = window.innerWidth - 24;
     const s = Math.min(availW / BASE_W, availH / BASE_H);
     wrap.style.transform = `scale(${Math.max(0.5, s)})`;
@@ -484,11 +493,20 @@
   }
   window.addEventListener('resize', fitToViewport);
 
-  // ---- Init ----
+  // ---- Init + tidsbasert loop ----
   drawRibbon();
   buildBricks();
   resetBall();
   fitToViewport();
+
+  let prev = performance.now();
+  function loop(now){
+    const dt = Math.min(0.033, (now - prev) / 1000); // max 33ms for stabilitet
+    prev = now;
+    draw();
+    update(now, dt);
+    requestAnimationFrame(loop);
+  }
   requestAnimationFrame(loop);
 
   // ---- Utils ----
